@@ -1,0 +1,56 @@
+---
+title: "Data Cleaning Survey Data"
+subtitle: "Southeast Texas Flood Governance"
+format: html
+editor: visual
+---
+
+```{r}
+#| label: load-packages
+#| message: false
+#| warning: false
+
+library(tidyverse)
+library(qualtRics)
+library(janitor)
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+# Qualtrics
+
+Using the `qualtRics` package the surveys were pulled directly from Qualtrics. In order to connect to the Qualtrics API, you must have UT staff privileges. Any UT student must have their privileges updated by contacting UT IT Services. Your Qualtrics API can be accessed through account settings in the "Qualtrics IDs" section.
+
+Do not, I repeat, **DO NOT** upload your API key to github or you repo will be erased.
+
+```{r}
+#| label: qualtrics
+#| message: false
+#| warning: false
+
+
+# Connecting to the Qualtrics API
+# There's always problem with the api. Make sure they haven't changed your key.....
+# set your api key using Sys.setenv("NAME" = "API KEY")
+qualtrics_api_credentials(api_key = Sys.getenv("qualtrics_key"),
+                          base_url = "ca1.qualtrics.com")
+
+#Pulling the organization and students surveys 
+surveys <- all_surveys() 
+
+#Finding the row index for organization and student surveys
+survey_number <- which(surveys$name=="Southeast Texas Flood Governance Survey - V2", arr.ind=TRUE)
+
+survey_raw <- fetch_survey(surveyID = surveys$id[survey_number], force_request = TRUE)
+```
+
+```{r cleaning}
+
+
+df <- survey_raw |> 
+  clean_names() |> 
+  filter(!is.na(ip_address),
+         progress == 100)
+
+```

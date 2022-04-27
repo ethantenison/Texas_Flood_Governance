@@ -1,6 +1,7 @@
 ---
 title: "Data Cleaning Survey Data"
 subtitle: "Southeast Texas Flood Governance"
+author: "Ethan Tenison"
 format: html
 editor: visual
 ---
@@ -14,6 +15,8 @@ library(tidyverse)
 library(qualtRics)
 library(janitor)
 library(Hmisc)
+library(visNetwork)
+library(igraph)
 
 knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
@@ -23,7 +26,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 
 Using the `qualtRics` package the surveys were pulled directly from Qualtrics. In order to connect to the Qualtrics API, you must have UT staff privileges. Any UT student must have their privileges updated by contacting UT IT Services. Your Qualtrics API can be accessed through account settings in the "Qualtrics IDs" section.
 
-Do not, I repeat, **DO NOT** upload your API key to github or you repo will be erased.
+Do not, I repeat, **DO NOT** upload your API key to github or the repo will be erased.
 
 ```{r}
 #| label: qualtrics
@@ -65,14 +68,14 @@ df <- df |>
   #removing unnecessary columns
   select(-c(start_date:recorded_date,external_data_reference:user_language)) |> 
   #renaming columns to make it comprehensible
-  rename(name = starts_with("what_is_the_name"))
+  rename(name = starts_with("what_is_the_name"),
+         org_type = starts_with("what_best_represents"))
 
 ```
 
 # Drivers and Impact 
 
-```{r section1}
-
+```{r drivers}
 
 
 drivers <- df |>
@@ -101,12 +104,13 @@ drivers <- df |>
 
 # Collaboration 
 
-```{r section2}
+```{r collab}
 
 collab <- df |> 
   select(
     response_id,
     name,
+    org_type1,
     starts_with("section_2"),
     starts_with("continued_information")
   ) |> 
@@ -132,6 +136,70 @@ collab <- df |>
     )
   ) |> 
   rename(addition_orgs = "continued_information_sharing_and_collaboration_networks_across_the_southeast_texas_can_you_think_of_other_agencies_or_organizations_not_listed_previously_with_whom_your_organization_goes_to_meetings_receives_or_shares_advice_or_information_or_implements_projects_within_or_across_the_southeast_texas_region")
+
+```
+
+### Network
+
+```{r network}
+
+collab_edges <- collab |>
+  select(name, starts_with("collab")) |>
+  pivot_longer(cols = starts_with("collab"),
+               names_to = "organization",
+               values_to = "partner") |> 
+  filter(!is.na(partner)) |> 
+  mutate(organization = gsub("partner", "", organization),
+         organization = gsub("_", " ", organization),
+         organization = gsub("collab", "", organization),
+         organization = str_to_title(organization)) |> 
+  select(-partner)
+
+g <- graph_from_data_frame(d=collab_edges,directed=TRUE) 
+degrees <-as.data.frame(igraph::degree(g)) |> 
+  rename("value" = 1) |>
+  rownames_to_column(var = "ego")
+
+gvis <- toVisNetworkData(g)
+
+nodes <- gvis$nodes
+nodes <- nodes |> 
+  left_join(degrees, by = c("id" = "ego") ) |> 
+  mutate(color = "#EE4B2B")
+
+collab_network <-
+  visNetwork(
+    nodes,
+    gvis$edges,
+    main = "Southeast Texas Flood Governance",
+    width = "100%",
+    height = "850px"
+  ) %>%
+  visEdges(
+    smooth = T,
+    arrows = list(
+      to = list(enabled = TRUE, scaleFactor = .5),
+      width = 3
+    ),
+    color = list(highlight = "black")
+  ) %>% 
+  visNodes(color = list(
+    background = "white",
+    border = "black",
+    highlight = list(background = "#A9A9A9", border = "black"),
+    hover = list(background = "#A9A9A9", border = "black")
+  )) %>%
+  visPhysics(stabilization = FALSE)  %>%
+  visIgraphLayout(
+    smooth = FALSE,
+    physics = FALSE,
+    layout = "layout_nicely",
+    randomSeed = 27
+  ) %>%
+  visInteraction(navigationButtons = TRUE)
+
+
+collab_network
 
 ```
 
@@ -176,6 +244,20 @@ qual <- df |>
     name,
     starts_with("generally_speaking"),
     starts_with("how_confident_are_you")
+  ) |> 
+  rename_with(
+    ~ gsub(
+      'generally_speaking_the_information_provided_by_the_following_organizations_is',
+      'information',
+      .x
+    )
+  ) |> 
+  rename_with(
+    ~ gsub(
+      'how_confident_are_you_in_this_organizations_capacity_to_minimize_the_impacts_of',
+      'confidence',
+      .x
+    )
   )
 
 

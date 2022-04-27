@@ -13,6 +13,7 @@ editor: visual
 library(tidyverse)
 library(qualtRics)
 library(janitor)
+library(Hmisc)
 
 knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
@@ -45,12 +46,55 @@ survey_number <- which(surveys$name=="Southeast Texas Flood Governance Survey - 
 survey_raw <- fetch_survey(surveyID = surveys$id[survey_number], force_request = TRUE)
 ```
 
+The main challenge with data cleaning is compiling the responses from the survey that are separated out over multiple columns. In order to make things more comprehensible, I'm going to break up the data set into thematic areas based on the sections. Each of these data sets will have a response id and organization name, so they can be recombined at the end to make comparison and create specialized data sets.
+
+# Data-wide cleaning
+
 ```{r cleaning}
 
 
-df <- survey_raw |> 
-  clean_names() |> 
-  filter(!is.na(ip_address),
-         progress == 100)
+df <- survey_raw 
+#changing the colnames to their labels 
+colnames(df) <- label(df)
 
+df <- df |> 
+  clean_names() |> 
+  #removing surveys that weren't completed
+  filter(!is.na(ip_address),
+         progress == 100) |> 
+  #removing unnecessary columns
+  select(-c(start_date:recorded_date,external_data_reference:user_language)) |> 
+  #renaming columns to make it comprehensible
+  rename(name = starts_with("what_is_the_name"))
+
+```
+
+# Section 1
+
+```{r section1}
+
+
+
+sec1 <- df |>
+  select(
+    response_id,
+    name,
+    starts_with("below_are_a_list_of_drivers"),
+    starts_with("below_are_a_list_of_flood")
+  ) |>
+  #renaming for comprehensibility purposes
+  rename_with(
+    ~ gsub(
+      'below_are_a_list_of_drivers_of_flood_risk_using_the_slider_tool_please_indicate_how_important_each_issue_below_is_to_you_your_organization_1_not_important_10_extremely_important',
+      'drivers',
+      .x
+    )
+  ) |> 
+  rename_with(
+    ~ gsub(
+      'below_are_a_list_of_flood_impacts_using_the_slider_tool_please_indicate_how_important_each_issue_below_is_to_you_your_organization_1_not_important_10_extremely_important',
+      'impacts',
+      .x
+    )
+  )
 ```

@@ -69,13 +69,13 @@ df <- df |>
 
 ```
 
-# Section 1
+# Drivers and Impact 
 
 ```{r section1}
 
 
 
-sec1 <- df |>
+drivers <- df |>
   select(
     response_id,
     name,
@@ -97,4 +97,86 @@ sec1 <- df |>
       .x
     )
   )
+```
+
+# Collaboration 
+
+```{r section2}
+
+collab <- df |> 
+  select(
+    response_id,
+    name,
+    starts_with("section_2"),
+    starts_with("continued_information")
+  ) |> 
+   rename_with(
+    ~ gsub(
+      'section_2_information_sharing_and_collaboration_networks_across_the_southeast_texas_below_you_will_see_a_list_of_texas_state_and_federal_agencies_that_work_within_and_across_the_southeast_texas_geography_of_interest_considering_the_past_2_years_whom_you_go_to_flood_related_meetings_virtually_or_in_person_receive_or_share_advice_or_information_or_implement_projects_within_or_across_the_southeast_texas_region_select_all_that_apply',
+      'collab',
+      .x
+    )
+  ) |> 
+  rename_with(
+    ~ gsub(
+      'continued_information_sharing_and_collaboration_networks_across_the_southeast_texas_below_you_will_see_a_list_of_agencies_and_organizations_that_dont_have_a_defined_jurisdiction_in_the_southeast_texas_but_may_be_a_part_of_your_network_among_the_list_below_please_consider_within_the_past_2_years_whom_you_go_to_flood_related_meetings_receive_or_share_advice_or_information_or_implement_projects_within_or_across_the_southeast_texas_select_all_that_apply',
+      'collab',
+      .x
+    )
+  ) |> 
+  rename_with(
+    ~ gsub(
+      'continued_information_sharing_and_collaboration_networks_across_the_southeast_texas_please_list_additional_organizations_groups_below_group_number',
+      'other_orgs',
+      .x
+    )
+  ) |> 
+  rename(addition_orgs = "continued_information_sharing_and_collaboration_networks_across_the_southeast_texas_can_you_think_of_other_agencies_or_organizations_not_listed_previously_with_whom_your_organization_goes_to_meetings_receives_or_shares_advice_or_information_or_implements_projects_within_or_across_the_southeast_texas_region")
+
+```
+
+# Who do you work with? 
+
+-   changed "respond recover or rebuild" to `rrr` because of space constraints
+
+-   changed "prepare or mitigate" to just `prepare`
+
+```{r section3}
+
+who <- df |> 
+  select(
+    response_id,
+    name,
+    starts_with("who_do_you_work_with")
+  ) |> 
+  rename_with(
+    ~ gsub(
+      'who_do_you_work_with_to_respond_recover_or_rebuild_the_following_impacts_of_flooding_of_importance_to_you_your_organization_',
+      'rrr_',
+      .x
+    )
+  ) |> 
+  rename_with(
+    ~ gsub(
+      'who_do_you_work_with_to_prepare_for_and_mitigate_the_following_drivers_of_flooding_of_importance_to_you_your_organization',
+      'prepare',
+      .x
+    )
+  )
+
+```
+
+# Quality of Relations 
+
+```{r information}
+
+qual <- df |> 
+  select(
+    response_id,
+    name,
+    starts_with("generally_speaking"),
+    starts_with("how_confident_are_you")
+  )
+
+
 ```

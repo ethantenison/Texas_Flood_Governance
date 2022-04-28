@@ -17,6 +17,7 @@ library(janitor)
 library(Hmisc)
 library(visNetwork)
 library(igraph)
+library(MetBrewer)
 
 knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
@@ -37,8 +38,9 @@ Do not, I repeat, **DO NOT** upload your API key to github or the repo will be e
 # Connecting to the Qualtrics API
 # There's always problem with the api. Make sure they haven't changed your key.....
 # set your api key using Sys.setenv("NAME" = "API KEY")
-qualtrics_api_credentials(api_key = Sys.getenv("qualtrics_key"),
-                          base_url = "ca1.qualtrics.com")
+qualtrics_api_credentials(
+  api_key= Sys.getenv("QUALTRICS_API_KEY"),
+  base_url = Sys.getenv("QUALTRICS_BASE_URL"))
 
 #Pulling the organization and students surveys 
 surveys <- all_surveys() 
@@ -49,7 +51,7 @@ survey_number <- which(surveys$name=="Southeast Texas Flood Governance Survey - 
 survey_raw <- fetch_survey(surveyID = surveys$id[survey_number], force_request = TRUE)
 ```
 
-The main challenge with data cleaning is compiling the responses from the survey that are separated out over multiple columns. In order to make things more comprehensible, I'm going to break up the data set into thematic areas based on the sections. Each of these data sets will have a response id and organization name, so they can be recombined at the end to make comparison and create specialized data sets.
+The main challenge with data cleaning is compiling the responses from the survey that are separated out over multiple columns. In order to make things more comprehensible, the data set is broken up into thematic areas. Each of these will have a response id and organization name, so they can be recombined at the end to make comparison and create specialized data sets.
 
 # Data-wide cleaning
 
@@ -70,10 +72,14 @@ df <- df |>
   #renaming columns to make it comprehensible
   rename(name = starts_with("what_is_the_name"),
          org_type = starts_with("what_best_represents"))
-
+dim(df)
 ```
 
-# Drivers and Impact 
+The data set contains `r nrow(df)` responses and `r ncol(df)` columns
+
+# Drivers and Impact
+
+Perceived drivers and impact of flooding.
 
 ```{r drivers}
 
@@ -100,9 +106,80 @@ drivers <- df |>
       .x
     )
   )
+
+
 ```
 
-# Collaboration 
+```{r drivers barplot}
+driver_bar <- drivers |> 
+  select(name, 3:7) |> 
+  pivot_longer(cols = starts_with("drivers"),
+               names_to = "driver",
+               values_to = "value") |> 
+  filter(!is.na(value)) |> 
+  mutate(driver = gsub("drivers", "", driver),
+         driver = gsub("_", " ", driver),
+         driver = str_to_title(driver)) |> 
+  group_by(driver) |> 
+  dplyr::summarize(avg = mean(value, na.rm = TRUE), sd = sd(value, na.rm = TRUE))
+
+driver_bar$driver[driver_bar$driver == " Geographic And Geophysical Factors Topography Proximity To Water Bodies"] <- "Geographic And Geophysical Factors\n Topography Proximity To Water Bodies"
+
+
+theme_set(theme_classic())
+ ggplot(driver_bar, aes(reorder(driver, avg), avg)) +
+   geom_bar(stat = "identity", fill = "#007ba5") +
+   scale_fill_manual(values=met.brewer("Egypt", 5)) +
+   labs(title = "Perceived Drivers of Flooding Risk",
+        subtitle = "(On a scale from 0-10)",
+        x = "",
+        y = ""
+        ) +
+   coord_flip() +
+   geom_errorbar(aes(ymin=avg-sd,
+                     ymax=avg+sd),
+                 width = .2) 
+```
+
+```{r impacts}
+
+impact_bar <- drivers |> 
+  select(name, 10:13) |> 
+  pivot_longer(cols = starts_with("impac"),
+               names_to = "impact",
+               values_to = "value") |> 
+  filter(!is.na(value)) |> 
+  mutate(impact = gsub("impacts", "", impact),
+         impact = gsub("_", " ", impact),
+         impact = str_to_title(impact)) |> 
+  group_by(impact) |> 
+  dplyr::summarize(avg = mean(value, na.rm = TRUE), sd = sd(value, na.rm = TRUE))
+
+impact_bar$impact[impact_bar$impact == " Ecological  E G  To Beaches Rivers Habitat Trails"] <- "Ecological  E G  To\n Beaches Rivers Habitat Trails"
+
+impact_bar$impact[impact_bar$impact == " Economic  Lost Revenue Costs Of Recovery"] <- "Economic  Lost Revenue\n Costs Of Recovery"
+
+impact_bar$impact[impact_bar$impact == " Infrastructure  Telecommunication Energy Transportation"] <- "Infrastructure  Telecommunication\n Energy Transportation"
+
+impact_bar$impact[impact_bar$impact == " Social  Population Displacement Health Social Inequalities"] <- "Social  Population Displacement\n Health Social Inequalities"
+
+theme_set(theme_classic())
+ ggplot(impact_bar, aes(reorder(impact, avg), avg)) +
+   geom_bar(stat = "identity", fill = "#00b67e") +
+   scale_fill_manual(values=met.brewer("Egypt", 5)) +
+   labs(title = "Perceived Issue Importance",
+        subtitle = "(On a scale from 0-10)",
+        x = "",
+        y = ""
+        ) +
+   coord_flip() +
+   geom_errorbar(aes(ymin=avg-sd,
+                     ymax=avg+sd),
+                 width = .2)
+
+```
+
+# Collaboration
 
 ```{r collab}
 
@@ -203,7 +280,7 @@ collab_network
 
 ```
 
-# Who do you work with? 
+# Who do you work with?
 
 -   changed "respond recover or rebuild" to `rrr` because of space constraints
 
@@ -234,7 +311,7 @@ who <- df |>
 
 ```
 
-# Quality of Relations 
+# Quality of Relations
 
 ```{r information}
 

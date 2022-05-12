@@ -110,6 +110,8 @@ drivers <- df |>
 
 ```
 
+There were two sets of questions referring to each
+
 ```{r drivers barplot}
 driver_bar <- drivers |> 
   select(name, 3:7) |> 
@@ -220,6 +222,7 @@ collab <- df |>
 
 ```{r network}
 
+#First create a long dataframe with organizations and their partners
 collab_edges <- collab |>
   select(name, starts_with("collab")) |>
   pivot_longer(cols = starts_with("collab"),
@@ -232,6 +235,16 @@ collab_edges <- collab |>
          organization = str_to_title(organization)) |> 
   select(-partner)
 
+node_type <- collab |> 
+  select(name, org_type1) |> 
+  mutate(org_type1 = as.character(org_type1),
+         org_type1 = case_when(
+           org_type1 == "County agency" ~ "County",
+           org_type1 == "State agency" ~ "State",
+           org_type1 == "Federal agency" ~ "Federal",
+           TRUE ~ org_type1
+         ))
+
 g <- graph_from_data_frame(d=collab_edges,directed=TRUE) 
 degrees <-as.data.frame(igraph::degree(g)) |> 
   rename("value" = 1) |>
@@ -239,19 +252,37 @@ degrees <-as.data.frame(igraph::degree(g)) |>
 
 gvis <- toVisNetworkData(g)
 
+met_pallete_org <- MetBrewer::met.brewer(name="Isfahan2",n=8)
+met_pallete_org <- as.character(met_pallete_org)
+
 nodes <- gvis$nodes
 nodes <- nodes |> 
   left_join(degrees, by = c("id" = "ego") ) |> 
-  mutate(color = "#EE4B2B")
+  left_join(node_type, by = c("id" = "name")) |> 
+  mutate(color = case_when(
+    org_type1 == "Nonprofit" ~ "#D7ACA1",
+    org_type1 == "Academia" ~ "#DAB745",
+    org_type1 == "County" ~ "#CEBD09",
+    org_type1 == "State" ~ "#95B22E",
+    org_type1 == "Federal" ~ "#65AF66",
+    org_type1 == "Municipal" ~ "#3DB4B2",
+    org_type1 == "Other" ~ "#4063A3",
+    is.na(org_type1) ~ "#3992B7"
+  ))
+
+nodes <- nodes |> 
+  select(everything(), -org_type1)
+
+edges <- gvis$edges
 
 collab_network <-
   visNetwork(
     nodes,
-    gvis$edges,
+    edges,
     main = "Southeast Texas Flood Governance",
     width = "100%",
     height = "850px"
-  ) %>%
+  ) |>
   visEdges(
     smooth = T,
     arrows = list(
@@ -259,20 +290,19 @@ collab_network <-
       width = 3
     ),
     color = list(highlight = "black")
-  ) %>% 
+  ) |> 
   visNodes(color = list(
     background = "white",
     border = "black",
     highlight = list(background = "#A9A9A9", border = "black"),
     hover = list(background = "#A9A9A9", border = "black")
-  )) %>%
-  visPhysics(stabilization = FALSE)  %>%
+  )) |>
+  visPhysics(stabilization = FALSE)  |> 
   visIgraphLayout(
     smooth = FALSE,
     physics = FALSE,
-    layout = "layout_nicely",
     randomSeed = 27
-  ) %>%
+  ) |>
   visInteraction(navigationButtons = TRUE)
 
 
@@ -282,32 +312,80 @@ collab_network
 
 # Who do you work with?
 
--   changed "respond recover or rebuild" to `rrr` because of space constraints
-
--   changed "prepare or mitigate" to just `prepare`
+-   Separated into "respond recover or rebuild" and prepare
 
 ```{r section3}
 
-who <- df |> 
+rrr <- df |> 
   select(
-    response_id,
     name,
-    starts_with("who_do_you_work_with")
+    starts_with("who_do_you_work_with_to_respond")
   ) |> 
   rename_with(
     ~ gsub(
       'who_do_you_work_with_to_respond_recover_or_rebuild_the_following_impacts_of_flooding_of_importance_to_you_your_organization_',
-      'rrr_',
+      '',
       .x
     )
+  ) 
+
+pre <- df |> 
+  select(
+    name,
+    starts_with("who_do_you_work_with_to_prepare")
   ) |> 
   rename_with(
     ~ gsub(
       'who_do_you_work_with_to_prepare_for_and_mitigate_the_following_drivers_of_flooding_of_importance_to_you_your_organization',
-      'prepare',
+      '',
       .x
     )
   )
+
+
+
+```
+
+### Respond 
+
+```{r respond}
+
+#Going from wide to long
+rrr2 <- rrr |>
+  #the index numbers have to be changed for different surveys
+  pivot_longer(cols = 2:313,
+               names_to = "organization",
+               values_to = "rrr") |>
+  filter(!is.na(rrr)) |> 
+  mutate(organization = gsub("_social_impacts", "", organization),
+         organization = gsub("_infrastructure_impacts", "", organization),
+         organization = gsub("_ecological_impacts", "", organization),
+         organization = gsub("_economic_impacts", "", organization),
+         organization = gsub("_other_number_1", "", organization),
+         organization = gsub("_", " ", organization),
+         organization = str_to_title(organization)
+         )
+```
+
+### Prepare 
+
+```{r prepare}
+
+pre2 <- pre |>
+  #the index numbers have to be changed for different surveys
+  pivot_longer(cols = 2:313,
+               names_to = "organization",
+               values_to = "pre") |>
+  filter(!is.na(pre)) |> 
+  mutate(organization = gsub("_changing_precipitation_and_weather_patterns", "", organization),
+         organization = gsub("_geographic_and_geophysical_factors", "", organization),
+         organization = gsub("_physical_roads_and_drainage_infrastructure", "", organization),
+         organization = gsub("_population_growth_and_distribution_of_people", "", organization),
+         organization = gsub("_socio_economic_factors_and_local_economy", "", organization),
+         organization = gsub("_other", "", organization),
+         organization = gsub("_", " ", organization),
+         organization = str_to_title(organization)
+         )
 
 ```
 
@@ -315,27 +393,66 @@ who <- df |>
 
 ```{r information}
 
-qual <- df |> 
+info <- df |> 
   select(
-    response_id,
     name,
-    starts_with("generally_speaking"),
+    starts_with("generally_speaking")
+  ) |> 
+  rename_with(
+    ~ gsub(
+      'generally_speaking_the_information_provided_by_the_following_organizations_is_',
+      '',
+      .x
+    )
+  ) 
+
+con <- df |> 
+  select(
+    name,
     starts_with("how_confident_are_you")
   ) |> 
   rename_with(
     ~ gsub(
-      'generally_speaking_the_information_provided_by_the_following_organizations_is',
-      'information',
-      .x
-    )
-  ) |> 
-  rename_with(
-    ~ gsub(
-      'how_confident_are_you_in_this_organizations_capacity_to_minimize_the_impacts_of',
-      'confidence',
+      'how_confident_are_you_in_this_organizations_capacity_to_minimize_the_impacts_of_',
+      '',
       .x
     )
   )
 
+```
+
+### Information
+
+```{r info}
+
+info2 <- info |>
+  #the index numbers have to be changed for different surveys
+  pivot_longer(cols = 2:53,
+               names_to = "organization",
+               values_to = "info") |>
+  filter(!is.na(info)) |> 
+  mutate(organization = gsub("_", " ", organization),
+         organization = str_to_title(organization))
+
 
 ```
+
+### Confidence
+
+### 
+
+```{r confidence}
+
+con2 <- con |>
+  #the index numbers have to be changed for different surveys
+  pivot_longer(cols = 2:53,
+               names_to = "organization",
+               values_to = "con") |>
+  filter(!is.na(con)) |> 
+  mutate(organization = gsub("_", " ", organization),
+         organization = str_to_title(organization))
+
+
+```
+
+### 

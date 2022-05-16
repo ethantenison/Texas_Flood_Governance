@@ -1,6 +1,6 @@
 ---
-title: "Data Cleaning Survey Data"
-subtitle: "Southeast Texas Flood Governance"
+title: "Southeast Texas Flood Governance"
+subtitle: "A network analysis"
 author: "Ethan Tenison"
 format: html
 editor: visual
@@ -27,7 +27,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 
 Using the `qualtRics` package the surveys were pulled directly from Qualtrics. In order to connect to the Qualtrics API, you must have UT staff privileges. Any UT student must have their privileges updated by contacting UT IT Services. Your Qualtrics API can be accessed through account settings in the "Qualtrics IDs" section.
 
-Do not, I repeat, **DO NOT** upload your API key to github or the repo will be erased.
+Do not, I repeat, **DO NOT** upload your API key to github or the repo will be erased. (add directions, add sys stuff)
 
 ```{r}
 #| label: qualtrics
@@ -51,12 +51,11 @@ survey_number <- which(surveys$name=="Southeast Texas Flood Governance Survey - 
 survey_raw <- fetch_survey(surveyID = surveys$id[survey_number], force_request = TRUE)
 ```
 
-The main challenge with data cleaning is compiling the responses from the survey that are separated out over multiple columns. In order to make things more comprehensible, the data set is broken up into thematic areas. Each of these will have a response id and organization name, so they can be recombined at the end to make comparison and create specialized data sets.
+The main challenge with data cleaning is compiling the responses from the survey that are separated out over multiple columns. In order to make things more comprehensible, the data set is broken up into thematic areas. Each of these will have a response id and organization name, so they can be recombined at the end to make comparison and create specialized data sets. (note progress)
 
 # Data-wide cleaning
 
 ```{r cleaning}
-
 
 df <- survey_raw 
 #changing the colnames to their labels 
@@ -220,6 +219,10 @@ collab <- df |>
 
 ### Network
 
+(DOUBLE CHECK NODE DUPLICATES, typos etc, merge nodes if need to)
+
+\*department of emergency
+
 ```{r network}
 
 #First create a long dataframe with organizations and their partners
@@ -346,7 +349,7 @@ pre <- df |>
 
 ```
 
-### Respond 
+### Respond
 
 ```{r respond}
 
@@ -367,7 +370,7 @@ rrr2 <- rrr |>
          )
 ```
 
-### Prepare 
+### Prepare
 
 ```{r prepare}
 
@@ -439,8 +442,6 @@ info2 <- info |>
 
 ### Confidence
 
-### 
-
 ```{r confidence}
 
 con2 <- con |>
@@ -456,3 +457,5 @@ con2 <- con |>
 ```
 
 ### 
+
+-   New dataframe matching new groups with their email address

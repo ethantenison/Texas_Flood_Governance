@@ -8,7 +8,7 @@
 |    +-- processed  <- The final, canonical data sets for modeling
 |    +-- raw        <- The original, immutable data dump
 |
-+-- rmarkdown       <- Rmarkdown documents
++-- quarto          <- Quarto documents
 |
 +-- references      <- explanatory materials
 |

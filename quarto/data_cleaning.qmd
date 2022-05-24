@@ -74,7 +74,15 @@ df <- df |>
   select(-c(start_date:recorded_date,external_data_reference:user_language)) |> 
   #renaming columns to make it comprehensible
   rename(name = starts_with("what_is_the_name"),
-         org_type = starts_with("what_best_represents"))
+         org_type = starts_with("what_best_represents")) |> 
+  mutate(
+  org_type1 = as.character(org_type1),
+         org_type1 = case_when(
+           org_type1 == "County agency" ~ "County",
+           org_type1 == "State agency" ~ "State",
+           org_type1 == "Federal agency" ~ "Federal",
+           TRUE ~ org_type1
+         ))
 dim(df)
 ```
 
@@ -140,7 +148,7 @@ driver_bar$driver[driver_bar$driver == " Geographic And Geophysical Factors Topo
 
 theme_set(theme_classic())
  ggplot(driver_bar, aes( x = reorder(driver, avg), y = avg)) +
-   geom_boxplot(stat = "identity", fill = "#007ba5") +
+   geom_bar(stat = "identity", fill = "#007ba5") +
    scale_fill_manual(values=met.brewer("Egypt", 5)) +
    labs(title = "Perceived Drivers of Flooding Risk",
         subtitle = "(On a scale from 0-10)",
@@ -246,14 +254,7 @@ collab_edges <- collab |>
   select(-partner)
 
 node_type <- collab |> 
-  select(name, org_type1) |> 
-  mutate(org_type1 = as.character(org_type1),
-         org_type1 = case_when(
-           org_type1 == "County agency" ~ "County",
-           org_type1 == "State agency" ~ "State",
-           org_type1 == "Federal agency" ~ "Federal",
-           TRUE ~ org_type1
-         ))
+  select(name, org_type1)
 
 g <- graph_from_data_frame(d=collab_edges,directed=TRUE) 
 degrees <-as.data.frame(igraph::degree(g)) |> 
@@ -337,6 +338,7 @@ collab_network
 rrr <- df |> 
   select(
     name,
+    org_type1,
     starts_with("who_do_you_work_with_to_respond")
   ) |> 
   rename_with(
@@ -360,18 +362,16 @@ pre <- df |>
     )
   )
 
-
-
 ```
 
 ### Respond
 
-```{r respond}
+```{r respond_dataprep}
 
 #Going from wide to long
 rrr2 <- rrr |>
   #the index numbers have to be changed for different surveys
-  pivot_longer(cols = 2:313,
+  pivot_longer(cols = 3:314,
                names_to = "organization",
                values_to = "rrr") |>
   filter(!is.na(rrr)) |> 
@@ -383,6 +383,87 @@ rrr2 <- rrr |>
          organization = gsub("_", " ", organization),
          organization = str_to_title(organization)
          )
+
+
+
+```
+
+```{r respond_network}
+
+edges <- rrr2 |>
+  filter(rrr == "Social impacts") |> 
+  select(name, organization, org_type1)
+
+node_type <- rrr2 |> 
+  select(name, org_type1)
+
+g <- graph_from_data_frame(d=edges,directed=TRUE) 
+degrees <-as.data.frame(igraph::degree(g)) |> 
+  rename("value" = 1) |>
+  rownames_to_column(var = "ego")
+
+gvis <- toVisNetworkData(g)
+
+met_pallete_org <- MetBrewer::met.brewer(name="Isfahan2",n=8)
+met_pallete_org <- as.character(met_pallete_org)
+
+nodes <- gvis$nodes
+nodes <- nodes |> 
+  left_join(degrees, by = c("id" = "ego") ) |> 
+  left_join(node_type, by = c("id" = "name")) |> 
+  mutate(color = case_when(
+    org_type1 == "Nonprofit" ~ "#D7ACA1",
+    org_type1 == "Academia" ~ "#DAB745",
+    org_type1 == "County" ~ "#CEBD09",
+    org_type1 == "State" ~ "#95B22E",
+    org_type1 == "Federal" ~ "#65AF66",
+    org_type1 == "Municipal" ~ "#3DB4B2",
+    org_type1 == "Other" ~ "#4063A3",
+    is.na(org_type1) ~ "#3992B7"
+  ))
+
+nodes <- nodes |> 
+  select(everything(), -org_type1)
+
+edges <- gvis$edges
+
+network <-
+  visNetwork(
+    nodes,
+    edges,
+    main = "Social Impacts",
+    width = "100%",
+    height = "850px"
+  ) |>
+  visEdges(
+    smooth = T,
+    arrows = list(
+      to = list(enabled = TRUE, scaleFactor = .5),
+      width = 3
+    ),
+    color = list(highlight = "black")
+  ) |> 
+  visNodes(color = list(
+    background = "white",
+    border = "black",
+    highlight = list(background = "#A9A9A9", border = "black"),
+    hover = list(background = "#A9A9A9", border = "black")
+  )) |>
+  visPhysics(stabilization = FALSE)  |> 
+  visIgraphLayout(
+    smooth = FALSE,
+    physics = FALSE,
+    randomSeed = 27
+  ) |>
+  visInteraction(navigationButtons = TRUE)
+
+
+network
+```
+
+```{r respond_network2}
+
+
 ```
 
 ### Prepare

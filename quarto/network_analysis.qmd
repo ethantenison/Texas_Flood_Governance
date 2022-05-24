@@ -292,6 +292,7 @@ write.csv(rrr, file = "data/processed/rrr.csv", row.names = FALSE)
 pre <- df |> 
   select(
     name,
+    org_type1,
     starts_with("who_do_you_work_with_to_prepare")
   ) |> 
   rename_with(
@@ -301,6 +302,8 @@ pre <- df |>
       .x
     )
   )
+
+write.csv(rrr, file = "data/processed/prepare.csv", row.names = FALSE)
 
 ```
 
@@ -447,18 +450,15 @@ network
 
 ```
 
-```{r respond_network2}
-
-
-```
-
 ### Prepare
 
 ```{r prepare}
+#| context: setup
+library(tidyverse)
 
-pre2 <- pre |>
+pre2 <- read_csv("/Users/et/Desktop/Data_Projects/Texas_Flood_Governance/data/processed/prepare.csv") |>
   #the index numbers have to be changed for different surveys
-  pivot_longer(cols = 2:313,
+  pivot_longer(cols = 3:314,
                names_to = "organization",
                values_to = "pre") |>
   filter(!is.na(pre)) |> 
@@ -471,7 +471,107 @@ pre2 <- pre |>
          organization = gsub("_", " ", organization),
          organization = str_to_title(organization)
          )
+```
 
+```{r}
+pickerInput(
+  "prepare",
+  label = strong("Pick"),
+  choices = c(
+    "Social impacts",
+    "Economic impacts",
+    "Infrastructure impacts",
+    "Ecological impacts",
+    "Other #1"
+  ),
+  multiple  = FALSE,
+  selected = "Social impacts",
+  width = "50%"
+)
+visNetworkOutput("prepare_network", height = "700px")
+
+```
+
+```{r}
+#| context: server
+library(visNetwork)
+library(tidyverse)
+library(igraph)
+
+output$prepare_network <- visNetwork::renderVisNetwork({
+  
+  edges <- pre2 |>
+  filter(pre == input$prepare) |> 
+  dplyr::select(name, organization, org_type1)
+
+node_type <- pre2 |> 
+  select(name, org_type1)
+
+g <- graph_from_data_frame(d=edges,directed=TRUE) 
+degrees <-as.data.frame(igraph::degree(g)) |> 
+  rename("value" = 1) |>
+  rownames_to_column(var = "ego")
+
+gvis <- toVisNetworkData(g)
+
+met_pallete_org <- MetBrewer::met.brewer(name="Isfahan2",n=8)
+met_pallete_org <- as.character(met_pallete_org)
+
+nodes <- gvis$nodes
+nodes <- nodes |> 
+  left_join(degrees, by = c("id" = "ego") ) |> 
+  left_join(node_type, by = c("id" = "name")) |> 
+  mutate(color = case_when(
+    org_type1 == "Nonprofit" ~ "#D7ACA1",
+    org_type1 == "Academia" ~ "#DAB745",
+    org_type1 == "County" ~ "#CEBD09",
+    org_type1 == "State" ~ "#95B22E",
+    org_type1 == "Federal" ~ "#65AF66",
+    org_type1 == "Municipal" ~ "#3DB4B2",
+    org_type1 == "Other" ~ "#4063A3",
+    is.na(org_type1) ~ "#3992B7"
+  )) |> 
+  distinct()
+
+nodes <- nodes |> 
+  select(everything(), -org_type1)
+
+edges <- gvis$edges
+
+network <-
+  visNetwork(
+    nodes,
+    edges,
+    main = "Social Impacts",
+    width = "100%",
+    height = "850px"
+  ) |>
+  visEdges(
+    smooth = T,
+    arrows = list(
+      to = list(enabled = TRUE, scaleFactor = .5),
+      width = 3
+    ),
+    color = list(highlight = "black")
+  ) |> 
+  visNodes(color = list(
+    background = "white",
+    border = "black",
+    highlight = list(background = "#A9A9A9", border = "black"),
+    hover = list(background = "#A9A9A9", border = "black")
+  )) |>
+  visPhysics(stabilization = FALSE)  |> 
+  visIgraphLayout(
+    smooth = FALSE,
+    physics = FALSE,
+    randomSeed = 27
+  ) |>
+  visInteraction(navigationButtons = TRUE) |> 
+  visLegend(addNodes = lnodes, useGroups = FALSE)
+
+
+network
+})
 ```
 
 # Quality of Relations

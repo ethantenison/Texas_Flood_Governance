@@ -230,10 +230,6 @@ collab <- df |>
 
 ### Collab Edges and Nodes
 
-(DOUBLE CHECK NODE DUPLICATES, typos etc, merge nodes if need to)
-
-\*department of emergency
-
 ```{r collab_edges}
 
 #First create a long dataframe with organizations and their partners

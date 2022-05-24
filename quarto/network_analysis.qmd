@@ -3,7 +3,7 @@ title: "Southeast Texas Flood Governance"
 subtitle: "A network analysis"
 author: "Ethan Tenison"
 format: html
-editor: visual
+server: shiny
 ---
 
 ```{r}
@@ -12,93 +12,25 @@ editor: visual
 #| warning: false
 
 library(tidyverse)
-library(qualtRics)
 library(janitor)
 library(Hmisc)
 library(visNetwork)
 library(igraph)
 library(MetBrewer)
+library(shiny)
+library(shinyWidgets)
 
 knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
-# Qualtrics
-
-Using the `qualtRics` package the surveys were pulled directly from Qualtrics. In order to connect to the Qualtrics API, you must have UT staff privileges. Any UT student must have their privileges updated by contacting UT IT Services. Your Qualtrics API can be accessed through account settings in the "Qualtrics IDs" section.
-
-Do not, I repeat, **DO NOT** upload your API key to github or the repo will be erased. (add directions, add sys stuff)
-
 ```{r}
-#| label: qualtrics
-#| message: false
-#| warning: false
-
-
-# Connecting to the Qualtrics API
-# There's always problem with the api. Make sure they haven't changed your key.....
-# set your api key using Sys.setenv("NAME" = "API KEY")
-qualtrics_api_credentials(
-  api_key= Sys.getenv("QUALTRICS_API_KEY"),
-  base_url = Sys.getenv("QUALTRICS_BASE_URL"))
-
-#Pulling the organization and students surveys 
-surveys <- all_surveys() 
-
-#Finding the row index for organization and student surveys
-survey_number <- which(surveys$name=="Southeast Texas Flood Governance Survey - V2", arr.ind=TRUE)
-
-survey_raw <- fetch_survey(surveyID = surveys$id[survey_number], force_request = TRUE)
-
-df <- survey_raw 
-#changing the colnames to their labels 
-colnames(df) <- label(df)
-
-```
-
-### Data Cleaning 
-
-```{r data_cleaning}
-
-df <- df |> 
-  clean_names() |> 
-  filter(!is.na(ip_address),
-         progress == 100) 
-```
-
-```{r}
-
-df <- df |> 
-  #removing unnecessary columns
-  select(-c(start_date:recorded_date,external_data_reference:user_language)) |> 
-  #renaming columns to make it comprehensible
-  rename(name = starts_with("what_is_the_name"),
-         org_type = starts_with("what_best_represents")) |> 
-  mutate(
-  org_type1 = as.character(org_type1),
-         org_type1 = case_when(
-           org_type1 == "County agency" ~ "County",
-           org_type1 == "State agency" ~ "State",
-           org_type1 == "Federal agency" ~ "Federal",
-           TRUE ~ org_type1
-         ))
-
+#for some reasont his needs to be hardcoded 
+df <- readRDS("~/Desktop/Data_Projects/Texas_Flood_Governance/data/interim/survey_data.rds")
 ```
 
 \
-The main challenge with data cleaning is compiling the responses from the survey that are separated out over multiple columns. In order to make things more comprehensible, the data set is broken up into thematic areas. Each of these will have a response id and organization name, so they can be recombined at the end to make comparison and create specialized data sets. (note progress)
-
-The data set contains `r nrow(df)` responses and `r ncol(df)` columns
-
-### Remove Duplicates
-
-Sometimes multiple people from the same organization fill out the network survey. In which case \[need more clarification here. If we change the name to be the same then some connections are going to be double counted. It would be a lot of work to dis-tangle which connections are unique.
-
-```{r duplicates, eval=FALSE}
-
-```
-
-# Drivers and Impact
+Drivers and Impact
 
 Perceived drivers and impact of flooding.
 
@@ -288,7 +220,12 @@ nodes <- nodes |>
 
 edges <- gvis$edges
 
-
+lnodes <- data.frame(label = c("Nonprofit", "Academia", "County", "State",
+                               "Federal", "Municipal", "Other", "N/A"),
+                     shape = c( "ellipse"),
+                     color = c("#D7ACA1", "#DAB745","#CEBD09","#95B22E",
+                               "#65AF66","#3DB4B2","#4063A3", "#3992B7"  ),
+                     title = "Type", id = 1:8)
 
 ```
 
@@ -324,7 +261,8 @@ collab_network <-
     physics = FALSE,
     randomSeed = 27
   ) |>
-  visInteraction(navigationButtons = TRUE)
+  visInteraction(navigationButtons = TRUE) |> 
+  visLegend(addNodes = lnodes, useGroups = FALSE)
 
 
 collab_network
@@ -336,7 +274,6 @@ collab_network
 -   Separated into "respond recover or rebuild" and prepare
 
 ```{r section3}
-
 rrr <- df |> 
   select(
     name,
@@ -350,6 +287,7 @@ rrr <- df |>
       .x
     )
   ) 
+write.csv(rrr, file = "data/processed/rrr.csv", row.names = FALSE)
 
 pre <- df |> 
   select(
@@ -369,9 +307,19 @@ pre <- df |>
 ### Respond
 
 ```{r respond_dataprep}
+#| context: setup
+
+library(tidyverse)
+
+lnodes <- data.frame(label = c("Nonprofit", "Academia", "County", "State",
+                               "Federal", "Municipal", "Other", "N/A"),
+                     shape = c( "ellipse"),
+                     color = c("#D7ACA1", "#DAB745","#CEBD09","#95B22E",
+                               "#65AF66","#3DB4B2","#4063A3", "#3992B7"  ),
+                     title = "Type", id = 1:8)
 
 #Going from wide to long
-rrr2 <- rrr |>
+rrr2 <- read_csv("/Users/et/Desktop/Data_Projects/Texas_Flood_Governance/data/processed/rrr.csv") |>
   #the index numbers have to be changed for different surveys
   pivot_longer(cols = 3:314,
                names_to = "organization",
@@ -390,11 +338,37 @@ rrr2 <- rrr |>
 
 ```
 
-```{r respond_network}
+```{r}
+pickerInput(
+  "respond",
+  label = strong("Pick"),
+  choices = c(
+    "Social impacts",
+    "Economic impacts",
+    "Infrastructure impacts",
+    "Ecological impacts",
+    "Other #1"
+  ),
+  multiple  = FALSE,
+  selected = "Social impacts",
+  width = "50%"
+)
+visNetworkOutput("respond_network", height = "700px")
 
-edges <- rrr2 |>
-  filter(rrr == "Social impacts") |> 
-  select(name, organization, org_type1)
+```
+
+```{r}
+#| context: server
+
+library(visNetwork)
+library(tidyverse)
+library(igraph)
+
+output$respond_network <- visNetwork::renderVisNetwork({
+  
+  edges <- rrr2 |>
+  filter(rrr == input$respond) |> 
+  dplyr::select(name, organization, org_type1)
 
 node_type <- rrr2 |> 
   select(name, org_type1)
@@ -422,7 +396,8 @@ nodes <- nodes |>
     org_type1 == "Municipal" ~ "#3DB4B2",
     org_type1 == "Other" ~ "#4063A3",
     is.na(org_type1) ~ "#3992B7"
-  ))
+  )) |> 
+  distinct()
 
 nodes <- nodes |> 
   select(everything(), -org_type1)
@@ -457,10 +432,19 @@ network <-
     physics = FALSE,
     randomSeed = 27
   ) |>
-  visInteraction(navigationButtons = TRUE)
+  visInteraction(navigationButtons = TRUE) |> 
+  visLegend(addNodes = lnodes, useGroups = FALSE)
 
 
 network
+  
+})
+
+```
+
+```{r respond_network}
+
+
 ```
 
 ```{r respond_network2}

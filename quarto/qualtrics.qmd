@@ -1,0 +1,84 @@
+---
+title: "qualtrics"
+format: html
+editor: visual
+---
+
+# Qualtrics
+
+Using the `qualtRics` package the surveys were pulled directly from Qualtrics. In order to connect to the Qualtrics API, you must have UT staff privileges. Any UT student must have their privileges updated by contacting UT IT Services. Your Qualtrics API can be accessed through account settings in the "Qualtrics IDs" section.
+
+Do not, I repeat, **DO NOT** upload your API key to github or the repo will be erased. (add directions, add sys stuff)
+
+```{r}
+
+library(tidyverse)
+library(qualtRics)
+library(janitor)
+library(Hmisc)
+
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+```
+
+```{r}
+
+# Connecting to the Qualtrics API
+# There's always problem with the api. Make sure they haven't changed your key.....
+# set your api key using Sys.setenv("NAME" = "API KEY")
+qualtrics_api_credentials(
+  api_key= Sys.getenv("QUALTRICS_API_KEY"),
+  base_url = Sys.getenv("QUALTRICS_BASE_URL"))
+
+#Pulling the organization and students surveys 
+surveys <- all_surveys() 
+
+#Finding the row index for organization and student surveys
+survey_number <- which(surveys$name=="Southeast Texas Flood Governance Survey - V2", arr.ind=TRUE)
+
+survey_raw <- fetch_survey(surveyID = surveys$id[survey_number], force_request = TRUE)
+
+df <- survey_raw 
+#changing the colnames to their labels 
+colnames(df) <- label(df)
+
+df <- df |> 
+  clean_names() |> 
+  #removing surveys that weren't completed
+  filter(!is.na(ip_address),
+         progress == 100) |> 
+  #removing unnecessary columns
+  select(-c(start_date:recorded_date,external_data_reference:user_language)) |> 
+  #renaming columns to make it comprehensible
+  rename(name = starts_with("what_is_the_name"),
+         org_type = starts_with("what_best_represents")) |> 
+  mutate(
+  org_type1 = as.character(org_type1),
+         org_type1 = case_when(
+           org_type1 == "County agency" ~ "County",
+           org_type1 == "State agency" ~ "State",
+           org_type1 == "Federal agency" ~ "Federal",
+           TRUE ~ org_type1
+         ))
+```
+
+The main challenge with data cleaning is compiling the responses from the survey that are separated out over multiple columns. In order to make things more comprehensible, the data set is broken up into thematic areas. Each of these will have a response id and organization name, so they can be recombined at the end to make comparison and create specialized data sets. (note progress)
+
+The data set contains `r nrow(df)` responses and `r ncol(df)` columns
+
+### Remove Duplicates
+
+Sometimes multiple people from the same organization fill out the network survey. In which case \[need more clarification here. If we change the name to be the same then some connections are going to be double counted. It would be a lot of work to dis-tangle which connections are unique.
+
+```{r duplicates, eval=FALSE}
+
+```
+
+### Saving
+
+```{r}
+
+saveRDS(df, file = "data/interim/survey_data.rds")
+```

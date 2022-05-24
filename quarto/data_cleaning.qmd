@@ -49,23 +49,26 @@ surveys <- all_surveys()
 survey_number <- which(surveys$name=="Southeast Texas Flood Governance Survey - V2", arr.ind=TRUE)
 
 survey_raw <- fetch_survey(surveyID = surveys$id[survey_number], force_request = TRUE)
-```
-
-The main challenge with data cleaning is compiling the responses from the survey that are separated out over multiple columns. In order to make things more comprehensible, the data set is broken up into thematic areas. Each of these will have a response id and organization name, so they can be recombined at the end to make comparison and create specialized data sets. (note progress)
-
-# Data-wide cleaning
-
-```{r cleaning}
 
 df <- survey_raw 
 #changing the colnames to their labels 
 colnames(df) <- label(df)
 
+```
+
+### Data Cleaning 
+
+```{r data_cleaning}
+
 df <- df |> 
   clean_names() |> 
-  #removing surveys that weren't completed
   filter(!is.na(ip_address),
-         progress == 100) |> 
+         progress == 100) 
+```
+
+```{r}
+
+df <- df |> 
   #removing unnecessary columns
   select(-c(start_date:recorded_date,external_data_reference:user_language)) |> 
   #renaming columns to make it comprehensible
@@ -79,8 +82,11 @@ df <- df |>
            org_type1 == "Federal agency" ~ "Federal",
            TRUE ~ org_type1
          ))
-dim(df)
+
 ```
+
+\
+The main challenge with data cleaning is compiling the responses from the survey that are separated out over multiple columns. In order to make things more comprehensible, the data set is broken up into thematic areas. Each of these will have a response id and organization name, so they can be recombined at the end to make comparison and create specialized data sets. (note progress)
 
 The data set contains `r nrow(df)` responses and `r ncol(df)` columns
 
@@ -88,7 +94,7 @@ The data set contains `r nrow(df)` responses and `r ncol(df)` columns
 
 Sometimes multiple people from the same organization fill out the network survey. In which case \[need more clarification here. If we change the name to be the same then some connections are going to be double counted. It would be a lot of work to dis-tangle which connections are unique.
 
-```{r duplicates}
+```{r duplicates, eval=FALSE}
 
 ```
 

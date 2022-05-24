@@ -18,6 +18,10 @@ library(Hmisc)
 library(visNetwork)
 library(igraph)
 library(MetBrewer)
+library(ggbeeswarm)
+library(ggdist)
+library(ggbeeswarm)
+library(gghalves)
 
 knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
@@ -76,12 +80,19 @@ dim(df)
 
 The data set contains `r nrow(df)` responses and `r ncol(df)` columns
 
+### Remove Duplicates
+
+Sometimes multiple people from the same organization fill out the network survey. In which case \[need more clarification here. If we change the name to be the same then some connections are going to be double counted. It would be a lot of work to dis-tangle which connections are unique.
+
+```{r duplicates}
+
+```
+
 # Drivers and Impact
 
 Perceived drivers and impact of flooding.
 
 ```{r drivers}
-
 
 drivers <- df |>
   select(
@@ -128,18 +139,18 @@ driver_bar$driver[driver_bar$driver == " Geographic And Geophysical Factors Topo
 
 
 theme_set(theme_classic())
- ggplot(driver_bar, aes(reorder(driver, avg), avg)) +
-   geom_bar(stat = "identity", fill = "#007ba5") +
+ ggplot(driver_bar, aes( x = reorder(driver, avg), y = avg)) +
+   geom_boxplot(stat = "identity", fill = "#007ba5") +
    scale_fill_manual(values=met.brewer("Egypt", 5)) +
    labs(title = "Perceived Drivers of Flooding Risk",
         subtitle = "(On a scale from 0-10)",
         x = "",
         y = ""
         ) +
-   coord_flip() +
-   geom_errorbar(aes(ymin=avg-sd,
-                     ymax=avg+sd),
-                 width = .2) 
+    coord_flip() +
+    geom_errorbar(aes(ymin=avg-sd,
+                      ymax=avg+sd),
+                  width = .2) 
 ```
 
 ```{r impacts}
@@ -217,13 +228,13 @@ collab <- df |>
 
 ```
 
-### Network
+### Collab Edges and Nodes
 
 (DOUBLE CHECK NODE DUPLICATES, typos etc, merge nodes if need to)
 
 \*department of emergency
 
-```{r network}
+```{r collab_edges}
 
 #First create a long dataframe with organizations and their partners
 collab_edges <- collab |>
@@ -277,6 +288,14 @@ nodes <- nodes |>
   select(everything(), -org_type1)
 
 edges <- gvis$edges
+
+
+
+```
+
+### Collab Network
+
+```{r collab_network}
 
 collab_network <-
   visNetwork(

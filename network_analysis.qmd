@@ -26,6 +26,7 @@ library(shiny)
 library(shinyWidgets)
 library(kableExtra)
 
+
 knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
@@ -89,7 +90,6 @@ driver_bar <- drivers |>
   dplyr::summarize(avg = mean(value, na.rm = TRUE), sd = sd(value, na.rm = TRUE))
 
 driver_bar$driver[driver_bar$driver == " Geographic And Geophysical Factors Topography Proximity To Water Bodies"] <- "Geographic And Geophysical Factors\n Topography Proximity To Water Bodies"
-
 
 theme_set(theme_classic())
  ggplot(driver_bar, aes( x = reorder(driver, avg), y = avg)) +
@@ -213,6 +213,15 @@ collab_edges <- collab |>
          organization = gsub("collab", "", organization),
          organization = str_to_title(organization)) |> 
   select(-partner)
+
+########################################################Dealing with duplicates
+collab_edges <- collab_edges |> 
+  mutate(organization = case_when(
+    organization == " Department Of Emergency Management Tdem " ~ 
+      " Texas Division Of Emergency Management ",
+    TRUE ~ organization
+  )) |> 
+  distinct()
 
 node_type <- collab |> 
   select(name, org_type1)

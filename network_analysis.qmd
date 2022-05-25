@@ -30,7 +30,7 @@ knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
-```{r}
+```{r, include=FALSE}
 
 #for some reasont his needs to be hardcoded 
 df <- readRDS("data/interim/survey_data.rds")
@@ -333,7 +333,7 @@ This section is split with the following two questions:
 
 2. Who do you work with to **respond, recover, or rebuild** the following impacts of flooding of importance to you/your organization?
 
-```{r section3}
+```{r section3, include = FALSE}
 rrr <- df |> 
   select(
     name,
@@ -371,8 +371,8 @@ write.csv(rrr, file = "data/processed/prepare.csv", row.names = FALSE)
 
 ```{r respond_dataprep}
 #| context: setup
-
 library(tidyverse)
+library(kableExtra)
 
 lnodes <- data.frame(label = c("Nonprofit", "Academia", "County", "State",
                                "Federal", "Municipal", "Other", "N/A"),
@@ -398,13 +398,20 @@ rrr2 <- read_csv("data/processed/rrr.csv") |>
          )
 
 
+rrr2 |> 
+  kbl() |> 
+  kable_styling() |> 
+  scroll_box(height = "500px")
 
 ```
+
+
+
 
 ```{r}
 pickerInput(
   "respond",
-  label = strong("Pick"),
+  label = "Pick an Impact Area:",
   choices = c(
     "Social impacts",
     "Economic impacts",
@@ -471,7 +478,7 @@ network <-
   visNetwork(
     nodes,
     edges,
-    main = "Social Impacts",
+    main = "Respond, Recover, Rebuild",
     width = "100%",
     height = "850px"
   ) |>
@@ -512,6 +519,7 @@ network
 ```{r prepare}
 #| context: setup
 library(tidyverse)
+library(kableExtra)
 
 pre2 <- read_csv("data/processed/prepare.csv") |>
   #the index numbers have to be changed for different surveys
@@ -528,12 +536,20 @@ pre2 <- read_csv("data/processed/prepare.csv") |>
          organization = gsub("_", " ", organization),
          organization = str_to_title(organization)
          )
+
+pre2 |> 
+  kbl() |> 
+  kable_styling() |> 
+  scroll_box(height = "500px")
 ```
+
+
+
 
 ```{r}
 pickerInput(
   "prepare",
-  label = strong("Pick"),
+  label = strong("Pick an Impact Area:"),
   choices = c(
     "Social impacts",
     "Economic impacts",
@@ -599,7 +615,7 @@ network <-
   visNetwork(
     nodes,
     edges,
-    main = "Social Impacts",
+    main = "Prepare and Mitigate",
     width = "100%",
     height = "850px"
   ) |>
@@ -633,11 +649,18 @@ network
 
 # Quality of Relations
 
+The following section is split up with two different questions:
+
+1. Generally speaking, the information provided by the following organizations is..
+
+2. How confident are you in this organization's capacity to minimize the impacts of flooding?
+
 ```{r information}
 
 info <- df |> 
   select(
     name,
+    org_type1,
     starts_with("generally_speaking")
   ) |> 
   rename_with(
@@ -651,6 +674,7 @@ info <- df |>
 con <- df |> 
   select(
     name,
+    org_type1,
     starts_with("how_confident_are_you")
   ) |> 
   rename_with(
@@ -669,7 +693,7 @@ con <- df |>
 
 info2 <- info |>
   #the index numbers have to be changed for different surveys
-  pivot_longer(cols = 2:53,
+  pivot_longer(cols = 3:54,
                names_to = "organization",
                values_to = "info") |>
   filter(!is.na(info)) |> 
@@ -677,7 +701,108 @@ info2 <- info |>
          organization = str_to_title(organization))
 
 
+
 ```
+
+```{r}
+met_pallete_org <- MetBrewer::met.brewer(name="Isfahan2",n=5)
+met_pallete_org <- as.character(met_pallete_org)
+
+edges <- info2 |>
+  select(name, organization, org_type1, info) |> 
+  #setting the width of edges 
+  mutate(value = case_when(
+    info == "Not Applicable" ~ 0.5,
+    info == "Somewhat useful" ~ 0.5,
+    info == "Useful" ~ 0.5,
+    info == "Very useful" ~ 0.5,
+    info == "Extremely useful" ~ 0.5,
+    TRUE ~ 0.5
+  ),
+  color = case_when(
+    info == "Not Applicable" ~ "#d7aca1",
+    info == "Somewhat useful" ~ "#ddc000",
+    info == "Useful" ~ "#79ad41",
+    info == "Very useful" ~ "#34b6c6",
+    info == "Extremely useful" ~ "#4063a3",
+    TRUE ~ "#d7aca1"
+  ))
+
+#edges legend information
+ledges <- data.frame(color = c("#d7aca1", "#ddc000", "#79ad41","#34b6c6",
+                               "#4063a3"),
+                     label = c("Not Applicable", "Somewhat useful", "Useful",
+                               "Very useful", "Extremely useful"),
+                     arrows =c("to", "to","to","to","to"))
+
+
+node_type <- edges |> 
+  select(name, org_type1)
+
+g <- graph_from_data_frame(d=edges,directed=TRUE) 
+degrees <-as.data.frame(igraph::degree(g)) |> 
+  rename("value" = 1) |>
+  rownames_to_column(var = "ego")
+
+gvis <- toVisNetworkData(g)
+
+met_pallete_org <- MetBrewer::met.brewer(name="Isfahan2",n=8)
+met_pallete_org <- as.character(met_pallete_org)
+
+nodes <- gvis$nodes
+nodes <- nodes |> 
+  left_join(degrees, by = c("id" = "ego") ) |> 
+  left_join(node_type, by = c("id" = "name")) |> 
+  mutate(color = "#D7ACA1")
+
+nodes <- nodes |> 
+  select(everything(), -org_type1) |> 
+  distinct()
+
+edges <- gvis$edges
+
+info2 |> 
+  kbl() |> 
+  kable_styling() |> 
+  scroll_box(height = "500px")
+
+info_network <-
+  visNetwork(
+    nodes,
+    edges,
+    main = "Information provided by the organizations is..",
+    width = "100%",
+    height = "850px"
+  ) |>
+  visEdges(
+    smooth = T,
+    arrows = list(
+      to = list(enabled = TRUE, scaleFactor = .5),
+      width = 3
+    ),
+    color = list(highlight = "black")
+  ) |> 
+  visNodes(color = list(
+    background = "white",
+    border = "black",
+    highlight = list(background = "#A9A9A9", border = "black"),
+    hover = list(background = "#A9A9A9", border = "black")
+  )) |>
+  visPhysics(stabilization = FALSE)  |> 
+  visIgraphLayout(
+    smooth = FALSE,
+    physics = FALSE,
+    randomSeed = 27,
+    layout = "layout_in_circle"
+  ) |>
+  visInteraction(navigationButtons = TRUE) |> 
+  visLegend(addEdges = ledges, useGroups = FALSE)
+
+
+info_network
+
+```
+
 
 ### Confidence
 
@@ -685,16 +810,115 @@ info2 <- info |>
 
 con2 <- con |>
   #the index numbers have to be changed for different surveys
-  pivot_longer(cols = 2:53,
+  pivot_longer(cols = 3:54,
                names_to = "organization",
                values_to = "con") |>
   filter(!is.na(con)) |> 
   mutate(organization = gsub("_", " ", organization),
          organization = str_to_title(organization))
 
-
+con2 |> 
+  kbl() |> 
+  kable_styling() |> 
+  scroll_box(height = "500px")
 ```
 
-### 
+```{r}
+met_pallete_org <- MetBrewer::met.brewer(name="Isfahan2",n=5)
+met_pallete_org <- as.character(met_pallete_org)
+
+edges <- con2 |>
+  select(name, organization, org_type1, con) |> 
+  #setting the width of edges 
+  mutate(value = case_when(
+    con == "Extremely Not confident" ~ 0.5,
+    con == "Not confident"  ~ 0.5,
+    con == "Slightly confident"  ~ 0.5,
+    con == "Somewhat confident"  ~ 0.5,
+    con == "Completely confident" ~ 0.5,
+    TRUE ~ 0.5
+  ),
+  color = case_when(
+    con == "Extremely Not confident" ~ "#d7aca1",
+    con == "Not confident" ~ "#ddc000",
+    con == "Slightly confident" ~ "#79ad41",
+    con == "Somewhat confident" ~ "#34b6c6",
+    con == "Completely confident" ~ "#4063a3",
+    TRUE ~ "#d7aca1"
+  ))
+
+#edges legend information
+ledges <- data.frame(color = c("#d7aca1", "#ddc000", "#79ad41","#34b6c6",
+                               "#4063a3"),
+                     label = c("Not Applicable", "Somewhat useful", "Useful",
+                               "Very useful", "Extremely useful"),
+                     arrows =c("to", "to","to","to","to"))
+
+
+node_type <- edges |> 
+  select(name, org_type1)
+
+g <- graph_from_data_frame(d=edges,directed=TRUE) 
+degrees <-as.data.frame(igraph::degree(g)) |> 
+  rename("value" = 1) |>
+  rownames_to_column(var = "ego")
+
+gvis <- toVisNetworkData(g)
+
+nodes <- gvis$nodes
+nodes <- nodes |> 
+  left_join(degrees, by = c("id" = "ego") ) |> 
+  left_join(node_type, by = c("id" = "name")) |> 
+  mutate(color ="#D7ACA1")
+
+nodes <- nodes |> 
+  select(everything(), -org_type1) |> 
+  distinct()
+
+edges <- gvis$edges
+
+info2 |> 
+  kbl() |> 
+  kable_styling() |> 
+  scroll_box(height = "500px")
+
+info_network <-
+  visNetwork(
+    nodes,
+    edges,
+    main = "How confident are you in this organization's capacity to minimize the impacts of flooding?",
+    width = "100%",
+    height = "850px"
+  ) |>
+  visEdges(
+    smooth = T,
+    arrows = list(
+      to = list(enabled = TRUE, scaleFactor = .5),
+      width = 3
+    ),
+    color = list(highlight = "black")
+  ) |> 
+  visNodes(color = list(
+    background = "white",
+    border = "black",
+    highlight = list(background = "#A9A9A9", border = "black"),
+    hover = list(background = "#A9A9A9", border = "black")
+  )) |>
+  visPhysics(stabilization = FALSE)  |> 
+  visIgraphLayout(
+    smooth = FALSE,
+    physics = FALSE,
+    randomSeed = 27,
+    layout = "layout_in_circle"
+  ) |>
+  visInteraction(navigationButtons = TRUE) |> 
+  visLegend(addEdges = ledges, useGroups = FALSE)
+
+
+info_network
+
+
+```
+### To add
 
 -   New dataframe matching new groups with their email address
